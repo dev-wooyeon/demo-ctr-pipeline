@@ -43,7 +43,7 @@ print_success "Docker is installed and running"
 
 # Docker Compose 확인
 print_step "Checking Docker Compose installation..."
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker compose &> /dev/null; then
     print_error "Docker Compose is not installed. Please install Docker Compose."
     exit 1
 fi
@@ -70,7 +70,7 @@ fi
 
 # 기존 컨테이너 중지 및 제거
 print_step "Stopping and removing existing containers..."
-docker-compose down -v
+docker compose down -v
 print_success "Existing containers stopped and removed"
 
 # 네트워크 정리
@@ -125,7 +125,7 @@ cd ..
 
 # Docker 서비스 시작
 print_step "Starting Docker services..."
-docker-compose up -d
+docker compose up -d
 
 # 서비스 시작 대기
 print_step "Waiting for services to start..."

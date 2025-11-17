@@ -8,96 +8,87 @@ import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 public class CTRResult {
+
+    private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
+    private static final DateTimeFormatter WINDOW_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'+09:00'").withZone(ZONE_SEOUL);
+    private static final DateTimeFormatter REDIS_KEY_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyyMMdd_HH:mm").withZone(ZONE_SEOUL);
+
     @JsonProperty("product_id")
-    public String productId;
+    private String productId;
 
     @JsonProperty("impressions")
-    public long impressions;
+    private long impressions;
 
     @JsonProperty("clicks")
-    public long clicks;
+    private long clicks;
 
     @JsonProperty("ctr")
-    public double ctr;
+    private double ctr;
 
     @JsonProperty("window_start")
-    public String windowStart;
+    private String windowStart;
 
     @JsonProperty("window_end")
-    public String windowEnd;
+    private String windowEnd;
 
-    // Keep original milliseconds for comparisons
-    public long windowStartMs;
-    public long windowEndMs;
+    private long windowStartMs;
+    private long windowEndMs;
 
     @JsonProperty("calculated_at")
-    public long calculatedAt;
+    private long calculatedAt;
 
-    public CTRResult() {}
+    public CTRResult() {
+        // For Flink / Jackson serialization
+    }
 
-    public CTRResult(String productId, long impressions, long clicks, long windowStartMs, long windowEndMs) {
+    private CTRResult(String productId, long impressions, long clicks, long windowStartMs, long windowEndMs) {
         this.productId = productId;
         this.impressions = impressions;
         this.clicks = clicks;
-        this.ctr = impressions > 0 ? (double) clicks / impressions : 0.0;
-        this.calculatedAt = System.currentTimeMillis();
-
-        // Set long timestamps
         this.windowStartMs = windowStartMs;
         this.windowEndMs = windowEndMs;
+        this.calculatedAt = System.currentTimeMillis();
+        this.ctr = calculateCtr(impressions, clicks);
+        this.windowStart = formatWindow(windowStartMs);
+        this.windowEnd = formatWindow(windowEndMs);
+    }
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'+09:00'")
-                .withZone(ZoneId.of("Asia/Seoul"));
-        this.windowStart = formatter.format(Instant.ofEpochMilli(windowStartMs));
-        this.windowEnd = formatter.format(Instant.ofEpochMilli(windowEndMs));
+    public static CTRResult fromCounts(ProductEventCounts counts, long windowStartMs, long windowEndMs) {
+        return new CTRResult(counts.getProductId(), counts.getImpressions(), counts.getClicks(), windowStartMs, windowEndMs);
+    }
+
+    private static double calculateCtr(long impressions, long clicks) {
+        return impressions > 0 ? (double) clicks / impressions : 0.0d;
+    }
+
+    private static String formatWindow(long timestampMs) {
+        return WINDOW_FORMATTER.format(Instant.ofEpochMilli(timestampMs));
     }
 
     public String getProductId() {
         return productId;
     }
 
-    public void setProductId(String productId) {
-        this.productId = productId;
-    }
-
     public long getImpressions() {
         return impressions;
-    }
-
-    public void setImpressions(long impressions) {
-        this.impressions = impressions;
     }
 
     public long getClicks() {
         return clicks;
     }
 
-    public void setClicks(long clicks) {
-        this.clicks = clicks;
-    }
-
     public double getCtr() {
         return ctr;
-    }
-
-    public void setCtr(double ctr) {
-        this.ctr = ctr;
     }
 
     public String getWindowStart() {
         return windowStart;
     }
 
-    public void setWindowStart(String windowStart) {
-        this.windowStart = windowStart;
-    }
-
     public String getWindowEnd() {
         return windowEnd;
-    }
-
-    public void setWindowEnd(String windowEnd) {
-        this.windowEnd = windowEnd;
     }
 
     public long getWindowStartMs() {
@@ -112,15 +103,8 @@ public class CTRResult {
         return calculatedAt;
     }
 
-    public void setCalculatedAt(long calculatedAt) {
-        this.calculatedAt = calculatedAt;
-    }
-
     public String getRedisKey(long windowStartMs) {
-        Instant instant = Instant.ofEpochMilli(windowStartMs);
-        String windowTimestamp = DateTimeFormatter.ofPattern("yyyyMMdd_HH:mm")
-                .withZone(ZoneId.of("Asia/Seoul"))
-                .format(instant);
+        String windowTimestamp = REDIS_KEY_FORMATTER.format(Instant.ofEpochMilli(windowStartMs));
         return String.format("ctr:%s:%s", productId, windowTimestamp);
     }
 

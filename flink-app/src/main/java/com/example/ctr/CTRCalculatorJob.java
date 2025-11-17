@@ -1,6 +1,5 @@
 package com.example.ctr;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.AggregateFunction;
@@ -29,47 +28,40 @@ import java.util.Map;
 
 public class CTRCalculatorJob {
 
+    private static final String BOOTSTRAP_SERVERS = "kafka1:29092,kafka2:29093,kafka3:29094";
+    private static final String IMPRESSION_TOPIC = "impressions";
+    private static final String CLICK_TOPIC = "clicks";
+    private static final Time WINDOW_SIZE = Time.seconds(10);
+    private static final Time WINDOW_LATENESS = Time.seconds(5);
+    private static final Duration WATERMARK_ALLOWED_LAG = Duration.ofSeconds(2);
+    private static final int PARALLELISM = 2;
+
     public static void main(String[] args) throws Exception {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        env.setParallelism(2);
+        env.setParallelism(PARALLELISM);
 
         ObjectMapper objectMapper = new ObjectMapper();
 
-        KafkaSource<Event> impressionSource = KafkaSource.<Event>builder()
-                .setBootstrapServers("kafka1:29092,kafka2:29093,kafka3:29094")
-                .setTopics("impressions")
-                .setGroupId("ctr-calculator-impressions")
-                .setStartingOffsets(OffsetsInitializer.latest())
-                .setValueOnlyDeserializer(new EventDeserializationSchema(objectMapper))
-                .build();
-
-        KafkaSource<Event> clickSource = KafkaSource.<Event>builder()
-                .setBootstrapServers("kafka1:29092,kafka2:29093,kafka3:29094")
-                .setTopics("clicks")
-                .setGroupId("ctr-calculator-clicks")
-                .setStartingOffsets(OffsetsInitializer.latest())
-                .setValueOnlyDeserializer(new EventDeserializationSchema(objectMapper))
-                .build();
+        KafkaSource<Event> impressionSource = createEventSource(IMPRESSION_TOPIC, "ctr-calculator-impressions", objectMapper);
+        KafkaSource<Event> clickSource = createEventSource(CLICK_TOPIC, "ctr-calculator-clicks", objectMapper);
 
         WatermarkStrategy<Event> watermarkStrategy = WatermarkStrategy
-                .<Event>forBoundedOutOfOrderness(Duration.ofSeconds(2))
+                .<Event>forBoundedOutOfOrderness(WATERMARK_ALLOWED_LAG)
                 .withTimestampAssigner(new EventTimestampExtractor());
 
-        DataStream<Event> impressionStream = env
-                .fromSource(impressionSource, watermarkStrategy, "Impression Source")
-                .filter(event -> "impression".equals(event.getEventType()));
+        DataStream<Event> impressionStream = buildEventStream(env, impressionSource, watermarkStrategy, "Impression Source")
+                .filter(Event::isImpression);
 
-        DataStream<Event> clickStream = env
-                .fromSource(clickSource, watermarkStrategy, "Click Source")
-                .filter(event -> "click".equals(event.getEventType()));
+        DataStream<Event> clickStream = buildEventStream(env, clickSource, watermarkStrategy, "Click Source")
+                .filter(Event::isClick);
 
         DataStream<Event> combinedStream = impressionStream.union(clickStream);
 
         SingleOutputStreamOperator<CTRResult> ctrResults = combinedStream
                 .keyBy(new ProductKeySelector())
-                .window(TumblingEventTimeWindows.of(Time.seconds(10)))
-                .allowedLateness(Time.seconds(5))
+                .window(TumblingEventTimeWindows.of(WINDOW_SIZE))
+                .allowedLateness(WINDOW_LATENESS)
                 .aggregate(new EventCountAggregator(), new CTRResultWindowProcessFunction());
 
         ctrResults.print("CTR Results");
@@ -77,6 +69,28 @@ public class CTRCalculatorJob {
         ctrResults.addSink(new RedisSink());
 
         env.execute("CTR Calculator Job");
+    }
+
+    private static KafkaSource<Event> createEventSource(String topic, String groupId, ObjectMapper objectMapper) {
+        return KafkaSource.<Event>builder()
+                .setBootstrapServers(BOOTSTRAP_SERVERS)
+                .setTopics(topic)
+                .setGroupId(groupId)
+                .setStartingOffsets(OffsetsInitializer.latest())
+                .setValueOnlyDeserializer(new EventDeserializationSchema(objectMapper))
+                .build();
+    }
+
+    private static DataStream<Event> buildEventStream(StreamExecutionEnvironment env,
+                                                      KafkaSource<Event> source,
+                                                      WatermarkStrategy<Event> watermarkStrategy,
+                                                      String sourceName) {
+        return env
+                .fromSource(source, watermarkStrategy, sourceName)
+                .name(sourceName)
+                .uid(sourceName)
+                .filter(Event::hasProductId)
+                .name(sourceName + " - With ProductId");
     }
 
     public static class EventDeserializationSchema implements DeserializationSchema<Event> {
@@ -104,7 +118,7 @@ public class CTRCalculatorJob {
 
     public static class ProductKeySelector implements KeySelector<Event, String> {
         @Override
-        public String getKey(Event event) throws Exception {
+        public String getKey(Event event) {
             return event.getProductId();
         }
     }
@@ -113,21 +127,12 @@ public class CTRCalculatorJob {
 
         @Override
         public ProductEventCounts createAccumulator() {
-            return new ProductEventCounts();
+            return ProductEventCounts.empty();
         }
 
         @Override
         public ProductEventCounts add(Event event, ProductEventCounts accumulator) {
-            if (accumulator.getProductId() == null) {
-                accumulator.setProductId(event.getProductId());
-            }
-
-            if ("impression".equals(event.getEventType())) {
-                accumulator.addImpression();
-            } else if ("click".equals(event.getEventType())) {
-                accumulator.addClick();
-            }
-
+            accumulator.addEvent(event);
             return accumulator;
         }
 
@@ -138,9 +143,6 @@ public class CTRCalculatorJob {
 
         @Override
         public ProductEventCounts merge(ProductEventCounts a, ProductEventCounts b) {
-            if (a.getProductId() == null && b.getProductId() != null) {
-                a.setProductId(b.getProductId());
-            }
             a.merge(b);
             return a;
         }
@@ -148,95 +150,69 @@ public class CTRCalculatorJob {
 
     public static class CTRResultWindowProcessFunction extends ProcessWindowFunction<ProductEventCounts, CTRResult, String, TimeWindow> {
         @Override
-        public void process(String key, Context context, Iterable<ProductEventCounts> elements, Collector<CTRResult> out) throws Exception {
+        public void process(String key, Context context, Iterable<ProductEventCounts> elements, Collector<CTRResult> out) {
             ProductEventCounts counts = elements.iterator().next();
-            CTRResult result = new CTRResult(
-                    key,
-                    counts.getImpressions(),
-                    counts.getClicks(),
-                    context.window().getStart(),
-                    context.window().getEnd()
-            );
+            CTRResult result = CTRResult.fromCounts(counts, context.window().getStart(), context.window().getEnd());
             out.collect(result);
         }
     }
 
     public static class RedisSink implements SinkFunction<CTRResult> {
+        private static final String LATEST_HASH_KEY = "ctr:latest";
+        private static final String PREVIOUS_HASH_KEY = "ctr:previous";
+        private static final int HASH_TTL_SECONDS = 3600;
+
         private transient JedisPool jedisPool;
         private transient ObjectMapper objectMapper;
 
         @Override
-        public void invoke(CTRResult ctrResult, Context context) throws Exception {
-            if (jedisPool == null) {
-                JedisPoolConfig config = new JedisPoolConfig();
-                config.setMaxTotal(10);
-                config.setMaxIdle(5);
-                config.setMinIdle(1);
-                jedisPool = new JedisPool(config, "redis", 6379);
-                objectMapper = new ObjectMapper();
-                System.out.println("RedisSink: JedisPool and ObjectMapper initialized.");
-            }
-
-            System.out.println("RedisSink: Invoked for product_id: " + ctrResult.getProductId() + ", CTR: " + ctrResult.getCtr());
+        public void invoke(CTRResult ctrResult, Context context) {
+            ensureDependencies();
 
             try (Jedis jedis = jedisPool.getResource()) {
-                String latestHashKey = "ctr:latest";
-                String previousHashKey = "ctr:previous";
                 String field = ctrResult.getProductId();
+                String newJsonValue = objectMapper.writeValueAsString(buildPayload(ctrResult));
 
-                // 1. Get the current "latest" value for this product.
-                String currentLatestValue = jedis.hget(latestHashKey, field);
-                System.out.println("RedisSink: currentLatestValue for " + field + ": " + currentLatestValue);
+                moveLatestToPrevious(jedis, field);
 
-                // Create the new JSON value for the "latest" hash.
-                Map<String, Object> newJsonData = new HashMap<>();
-                newJsonData.put("product_id", ctrResult.getProductId());
-                newJsonData.put("ctr", Double.parseDouble(String.format("%.4f", ctrResult.getCtr())));
-                newJsonData.put("impressions", ctrResult.getImpressions());
-                newJsonData.put("clicks", ctrResult.getClicks());
-                newJsonData.put("window_start", ctrResult.getWindowStartMs());
-                newJsonData.put("window_end", ctrResult.getWindowEndMs());
-                String newJsonValue = objectMapper.writeValueAsString(newJsonData);
-                System.out.println("RedisSink: newJsonValue for " + field + ": " + newJsonValue);
-
-                // 2. If a "latest" value exists, decide whether to move it to "previous".
-                if (currentLatestValue != null) {
-                    // Parse the existing value to check its window timestamp.
-                    Map<String, Object> currentLatestData = objectMapper.readValue(currentLatestValue, new TypeReference<Map<String, Object>>() {
-                    });
-
-                    // ✨ 수정된 안전한 로직
-                    Object windowEndObj = currentLatestData.get("window_end");
-                    long currentWindowEnd = 0L; // 기본값 초기화
-
-                    if (windowEndObj instanceof Number) {
-                        // 값이 이미 숫자 타입인 경우
-                        currentWindowEnd = ((Number) windowEndObj).longValue();
-                    } else if (windowEndObj instanceof String) {
-                        // 값이 문자열인 경우, 숫자로 파싱
-                        try {
-                            currentWindowEnd = Long.parseLong((String) windowEndObj);
-                        } catch (NumberFormatException e) {
-                            System.err.println("Could not parse window_end string to long: " + windowEndObj);
-                            // 에러 처리 또는 무시
-                        }
-                    }
-                    // Move the current latest value to previous
-                    jedis.hset(previousHashKey, field, currentLatestValue);
-                    jedis.expire(previousHashKey, 3600); // Also set TTL for previous
-                    System.out.println("RedisSink: Moved current latest for " + field + " to previous.");
-                } // End of if (currentLatestValue != null)
-
-                // 3. Always update the "latest" hash with the new value.
-                jedis.hset(latestHashKey, field, newJsonValue);
-                jedis.expire(latestHashKey, 3600); // 1 hour TTL
-
-                System.out.println("Updated Redis Hashes (Robust Logic) - Key: " + latestHashKey + ", Field: " + field);
-
-            } catch(Exception e){
+                jedis.hset(LATEST_HASH_KEY, field, newJsonValue);
+                jedis.expire(LATEST_HASH_KEY, HASH_TTL_SECONDS);
+            } catch (Exception e) {
                 System.err.println("Error saving to Redis: " + e.getMessage());
                 e.printStackTrace();
             }
+        }
+
+        private void ensureDependencies() {
+            if (jedisPool != null && objectMapper != null) {
+                return;
+            }
+            JedisPoolConfig config = new JedisPoolConfig();
+            config.setMaxTotal(10);
+            config.setMaxIdle(5);
+            config.setMinIdle(1);
+            jedisPool = new JedisPool(config, "redis", 6379);
+            objectMapper = new ObjectMapper();
+        }
+
+        private Map<String, Object> buildPayload(CTRResult ctrResult) {
+            Map<String, Object> newJsonData = new HashMap<>();
+            newJsonData.put("product_id", ctrResult.getProductId());
+            newJsonData.put("ctr", Double.parseDouble(String.format("%.4f", ctrResult.getCtr())));
+            newJsonData.put("impressions", ctrResult.getImpressions());
+            newJsonData.put("clicks", ctrResult.getClicks());
+            newJsonData.put("window_start", ctrResult.getWindowStartMs());
+            newJsonData.put("window_end", ctrResult.getWindowEndMs());
+            return newJsonData;
+        }
+
+        private void moveLatestToPrevious(Jedis jedis, String field) {
+            String currentLatestValue = jedis.hget(LATEST_HASH_KEY, field);
+            if (currentLatestValue == null) {
+                return;
+            }
+            jedis.hset(PREVIOUS_HASH_KEY, field, currentLatestValue);
+            jedis.expire(PREVIOUS_HASH_KEY, HASH_TTL_SECONDS);
         }
     }
 }

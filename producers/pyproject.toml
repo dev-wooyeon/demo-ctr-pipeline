@@ -5,7 +5,6 @@ description = "Kafka data producers for CTR calculation demo"
 authors = [
     { name = "CTR Demo", email = "demo@example.com" }
 ]
-readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "kafka-python>=2.0.2",

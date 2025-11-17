@@ -2,25 +2,37 @@ package com.example.ctr;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.Locale;
 import java.util.Objects;
 
+/**
+ * Domain representation of events flowing through the CTR pipeline.
+ * Mutable setters are kept for Jackson deserialization, but callers should use the helper
+ * predicates instead of working with raw strings.
+ */
 public class Event {
+
+    private static final String TYPE_IMPRESSION = "impression";
+    private static final String TYPE_CLICK = "click";
+
     @JsonProperty("user_id")
-    public String userId;
+    private String userId;
 
     @JsonProperty("product_id")
-    public String productId;
+    private String productId;
 
     @JsonProperty("timestamp")
-    public long timestamp;
+    private long timestamp;
 
     @JsonProperty("event_type")
-    public String eventType;
+    private String eventType;
 
     @JsonProperty("session_id")
-    public String sessionId;
+    private String sessionId;
 
-    public Event() {}
+    public Event() {
+        // Default constructor for Jackson
+    }
 
     public Event(String userId, String productId, long timestamp, String eventType, String sessionId) {
         this.userId = userId;
@@ -68,6 +80,22 @@ public class Event {
 
     public void setSessionId(String sessionId) {
         this.sessionId = sessionId;
+    }
+
+    public boolean isImpression() {
+        return matchesType(TYPE_IMPRESSION);
+    }
+
+    public boolean isClick() {
+        return matchesType(TYPE_CLICK);
+    }
+
+    public boolean hasProductId() {
+        return productId != null && !productId.isEmpty();
+    }
+
+    private boolean matchesType(String expectedType) {
+        return eventType != null && eventType.toLowerCase(Locale.ROOT).equals(expectedType);
     }
 
     @Override

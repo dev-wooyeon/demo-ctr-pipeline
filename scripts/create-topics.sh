@@ -37,7 +37,6 @@ docker exec kafka1 kafka-topics \
     --bootstrap-server localhost:9092 \
     --replication-factor 3 \
     --partitions 3 \
-    --min.insync.replicas 2 \
     --topic impressions \
     --if-not-exists
 
@@ -55,7 +54,6 @@ docker exec kafka1 kafka-topics \
     --bootstrap-server localhost:9092 \
     --replication-factor 3 \
     --partitions 3 \
-    --min.insync.replicas 2 \
     --topic clicks \
     --if-not-exists
 

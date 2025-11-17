@@ -3,36 +3,53 @@ package com.example.ctr;
 import java.util.Objects;
 
 public class ProductEventCounts {
-    public String productId;
-    public long impressions;
-    public long clicks;
 
-    public ProductEventCounts() {
-        this.impressions = 0;
-        this.clicks = 0;
-    }
+    private String productId;
+    private long impressions;
+    private long clicks;
 
-    public ProductEventCounts(String productId) {
-        this.productId = productId;
-        this.impressions = 0;
-        this.clicks = 0;
-    }
-
-    public ProductEventCounts(String productId, long impressions, long clicks) {
+    private ProductEventCounts(String productId, long impressions, long clicks) {
         this.productId = productId;
         this.impressions = impressions;
         this.clicks = clicks;
     }
 
-    public void addImpression() {
+    public static ProductEventCounts empty() {
+        return new ProductEventCounts(null, 0, 0);
+    }
+
+    public static ProductEventCounts of(String productId, long impressions, long clicks) {
+        return new ProductEventCounts(productId, impressions, clicks);
+    }
+
+    public void registerProduct(String productId) {
+        if (this.productId == null && productId != null) {
+            this.productId = productId;
+        }
+    }
+
+    public void addEvent(Event event) {
+        registerProduct(event.getProductId());
+        if (event.isImpression()) {
+            incrementImpression();
+        } else if (event.isClick()) {
+            incrementClick();
+        }
+    }
+
+    public void incrementImpression() {
         this.impressions++;
     }
 
-    public void addClick() {
+    public void incrementClick() {
         this.clicks++;
     }
 
     public void merge(ProductEventCounts other) {
+        if (other == null) {
+            return;
+        }
+        registerProduct(other.productId);
         this.impressions += other.impressions;
         this.clicks += other.clicks;
     }
@@ -41,24 +58,12 @@ public class ProductEventCounts {
         return productId;
     }
 
-    public void setProductId(String productId) {
-        this.productId = productId;
-    }
-
     public long getImpressions() {
         return impressions;
     }
 
-    public void setImpressions(long impressions) {
-        this.impressions = impressions;
-    }
-
     public long getClicks() {
         return clicks;
-    }
-
-    public void setClicks(long clicks) {
-        this.clicks = clicks;
     }
 
     @Override
