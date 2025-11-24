@@ -134,7 +134,7 @@ sleep 30
 # Kafka 클러스터 상태 확인
 print_step "Checking Kafka cluster status..."
 for i in {1..30}; do
-    if docker exec kafka1 kafka-topics --bootstrap-server localhost:9092 --list &> /dev/null; then
+    if docker exec kafka1 kafka-topics --bootstrap-server kafka1:29092 --list &> /dev/null; then
         print_success "Kafka cluster is ready"
         break
     fi
@@ -147,9 +147,89 @@ for i in {1..30}; do
 done
 
 # Kafka 토픽 생성
+# Kafka 토픽 생성
 print_step "Creating Kafka topics..."
-chmod +x scripts/create-topics.sh
-./scripts/create-topics.sh
+
+# impressions 토픽
+docker exec kafka1 kafka-topics \
+    --create \
+    --bootstrap-server kafka1:29092 \
+    --replication-factor 3 \
+    --partitions 3 \
+    --topic impressions \
+    --if-not-exists
+
+if [ $? -eq 0 ]; then
+    print_success "Topic 'impressions' created (or already exists)"
+else
+    print_error "Failed to create topic 'impressions'"
+    exit 1
+fi
+
+# clicks 토픽
+docker exec kafka1 kafka-topics \
+    --create \
+    --bootstrap-server kafka1:29092 \
+    --replication-factor 3 \
+    --partitions 3 \
+    --topic clicks \
+    --if-not-exists
+
+if [ $? -eq 0 ]; then
+    print_success "Topic 'clicks' created (or already exists)"
+else
+    print_error "Failed to create topic 'clicks'"
+    exit 1
+fi
+
+# 토픽 리스트 확인
+print_step "Verifying topics..."
+docker exec kafka1 kafka-topics --bootstrap-server kafka1:29092 --list
+
+# ClickHouse 테이블 생성
+print_step "Initializing ClickHouse table..."
+# Wait for ClickHouse to be ready
+for i in {1..30}; do
+    if docker exec clickhouse clickhouse-client --query "SELECT 1" &> /dev/null; then
+        break
+    fi
+    if [ $i -eq 30 ]; then
+        print_warning "ClickHouse might not be ready yet. Proceeding anyway..."
+    fi
+    echo "Waiting for ClickHouse... ($i/30)"
+    sleep 1
+done
+
+docker exec clickhouse clickhouse-client --query "
+CREATE TABLE IF NOT EXISTS default.ctr_results (
+    product_id String,
+    ctr Float64,
+    impressions UInt64,
+    clicks UInt64,
+    window_start UInt64,
+    window_end UInt64
+) ENGINE = MergeTree()
+ORDER BY (window_end, product_id);
+"
+
+if [ $? -eq 0 ]; then
+    print_success "ClickHouse table 'ctr_results' created successfully"
+else
+    print_error "Failed to create ClickHouse table"
+    # Don't exit, just warn
+fi
+
+
+
+# Flink Job 배포
+print_step "Deploying Flink Job..."
+chmod +x scripts/deploy-flink-job.sh
+./scripts/deploy-flink-job.sh
+
+# Data Producer 시작
+print_step "Starting Data Producers..."
+chmod +x scripts/start-producers.sh
+./scripts/start-producers.sh
 
 # 서비스 상태 확인
 print_step "Checking service status..."
@@ -160,14 +240,13 @@ echo "Kafka UI: http://localhost:8080"
 echo "Flink Web UI: http://localhost:8081"
 echo "RedisInsight: http://localhost:5540"
 echo "Fast API: http://localhost:8000"
+echo "Grafana: http://localhost:3000"
 echo ""
 
-print_success "Setup completed successfully!"
+print_success "Setup completed successfully! The entire pipeline is running."
 echo ""
-echo "Next steps:"
-echo "1. Access Kafka UI at http://localhost:8080 to verify topics"
-echo "2. Access Flink Web UI at http://localhost:8081"  
-echo "3. Deploy Flink job: ./scripts/deploy-flink-job.sh"
-echo "4. Start data producers: ./scripts/start-producers.sh"
-echo "5. Monitor results in RedisInsight: http://localhost:5540"
-echo "6. Serving API in FastAPI: http://localhost:8000"
+echo "You can now:"
+echo "1. Monitor results in RedisInsight: http://localhost:5540"
+echo "2. View Flink Job in Web UI: http://localhost:8081"
+echo "3. Check Grafana Dashboards: http://localhost:3000"
+echo "4. Access Serving API: http://localhost:8000/docs"

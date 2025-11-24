@@ -1,10 +1,11 @@
-# (Demo)Real-time CTR Calculation Pipeline
+# (Demo)실시간 클릭율 및 조회수 파이프라인
 
-This project demonstrates a complete, real-time data pipeline for calculating Click-Through-Rate (CTR) from streaming impression and click events. The pipeline is built using Kafka, Flink, and Redis, and includes a FastAPI backend to serve the results.
+이 프로젝트는 스트리밍 조회(impression) 및 클릭(click) 이벤트로부터 CTR(Click-Through-Rate)을 처리하는 파이프라인을 실습합니다.  이 파이프라인은 Kafka, Flink, Redis 를 사용하여 구축되었으며, 결과를 제공하기 위한 FastAPI 백엔드를 포함합니다.  
+또한 분석용 싱크(Sink)로 **ClickHouse**와 **DuckDB**를 포함하며, 모니터링을 위한 **Prometheus/Grafana** 스택도 갖추고 있습니다.
 
-## 🏛️ Architecture
+## 🏛️ 아키텍처
 
-The data flows through the system as follows:
+데이터는 다음과 같이 시스템을 통해 흐릅니다:
 
 ```
                                       ┌──────────────────┐
@@ -17,158 +18,167 @@ The data flows through the system as follows:
 ┌──────────┐   ┌───────┐   ┌───────────┐   ┌───────┐
 │ Producers│──>│ Kafka │──>│ Flink App │──>│ Redis │
 └──────────┘   └───────┘   └───────────┘   └───────┘
-     (Python)   (Events)    (10s Window)   (Hashes) │
-                                                    │
-                                                    ▼
+     (Python)   (Events)    (10s Window)   │ (Hashes)
+                                           │
+                                           ├──> ┌────────────┐
+                                           │    │ ClickHouse │
+                                           │    └────────────┘
+                                           │
+                                           └──> ┌────────────┐
+                                                │   DuckDB   │
+                                                └────────────┘
+                                                      
                                              ┌──────────────┐
                                              │ RedisInsight │
                                              └──────────────┘
 ```
 
-## ✨ Key Features
+## ✨ 주요 기능
 
--   **Real-time Processing:** Calculates CTR over a **10-second** tumbling window.
--   **Stateful Analysis:** Maintains both the **latest** and the **immediately preceding** CTR results for comparative analysis.
--   **RESTful API:** A FastAPI server provides endpoints to access the calculated CTR data.
--   **Containerized:** The entire environment is containerized using Docker and managed with Docker Compose and shell scripts.
--   **Scalable:** Built on industry-standard, scalable components like Kafka and Flink.
+-   **실시간 처리:** **10초** 텀블링 윈도우(Tumbling Window)에 걸쳐 CTR을 계산합니다.
+-   **상태 기반 분석:** 비교 분석을 위해 **최신** CTR 결과와 **직전** CTR 결과를 모두 유지합니다.
+-   **멀티 싱크(Multi-Sink) 저장소:**
+    -   **Redis:** 저지연(Low-latency) 서빙용.
+    -   **ClickHouse:** 고성능 OLAP 분석용.
+    -   **DuckDB:** 임베디드/로컬 파일 기반 분석용.
+-   **관측 가능성(Observability):** **Prometheus**(메트릭 수집)와 **Grafana**(대시보드)를 통한 포괄적인 모니터링.
+-   **RESTful API:** 계산된 CTR 데이터에 접근할 수 있는 엔드포인트를 제공하는 FastAPI 서버.
+-   **컨테이너화:** 전체 환경은 Docker를 사용하여 컨테이너화되어 있으며, Docker Compose와 쉘 스크립트로 관리됩니다.
 
-## 🧩 Components
+## 🧩 구성 요소
 
-| Component         | Directory         | Description                                                                                                                            |
-| ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Data Producers**  | `producers/`      | Python scripts that simulate user impressions and clicks, sending them as events to Kafka topics.                                    |
-| **Event Stream**    | `docker-compose`  | A 3-broker Kafka cluster for ingesting event streams.                                                                                  |
-| **Flink Processor** | `flink-app/`      | A Java/Flink application that consumes events, performs a stateful CTR calculation, and sinks results to Redis.                      |
-| **Data Store**      | `docker-compose`  | A Redis instance used to store the latest and previous CTR calculation results in Hashes.                                            |
-| **Serving API**     | `serving-api/`    | A Python/FastAPI application that reads from Redis and exposes CTR data via a REST API. Managed by Docker Compose.                   |
-| **Monitoring UIs**  | `docker-compose`  | Kafka UI, Flink Dashboard, and RedisInsight for observing and managing the system components.                                          |
+| 컴포넌트 | 디렉토리 | 설명 |
+| --- | --- | --- |
+| **Data Producers** | `producers/` | 사용자 노출 및 클릭을 시뮬레이션하여 Kafka 토픽으로 이벤트를 전송하는 Python 스크립트입니다. |
+| **Event Stream** | `docker-compose` | 이벤트 스트림 수집을 위한 3개의 브로커로 구성된 Kafka 클러스터입니다. |
+| **Flink Processor** | `flink-app/` | 이벤트를 소비하고, 상태 기반 CTR 계산을 수행하며, 결과를 Redis, ClickHouse, DuckDB로 전송하는 Java/Flink 애플리케이션입니다. |
+| **Data Stores** | `docker-compose` | Redis (Hot data), ClickHouse (OLAP), DuckDB (Local analysis). |
+| **Serving API** | `serving-api/` | Redis에서 데이터를 읽어 REST API를 통해 CTR 데이터를 노출하는 Python/FastAPI 애플리케이션입니다. Docker Compose로 관리됩니다. |
+| **Monitoring** | `docker-compose` | Prometheus (Metrics) 및 Grafana (Visualization). |
+| **Monitoring UIs** | `docker-compose` | 시스템 컴포넌트를 관찰하고 관리하기 위한 Kafka UI, Flink Dashboard, RedisInsight, Grafana입니다. |
+| **Performance Test**| `performance-test/`| API 부하 테스트 및 윈도우 로직 검증을 위한 Python 스크립트입니다. |
 
-## 🛠️ Technology Stack
+## 🛠️ 기술 스택
 
 -   **Streaming:** Apache Kafka, Apache Flink
 -   **Backend & Serving:** FastAPI, Uvicorn
--   **Database:** Redis
+-   **Databases:** Redis, ClickHouse, DuckDB
+-   **Monitoring:** Prometheus, Grafana
 -   **Languages:** Java 11, Python 3.8
 -   **Containerization:** Docker, Docker Compose
 -   **Build Tools:** Maven, uv
 
-## 🚀 Getting Started
+## 🚀 시작하기
 
-Follow these steps to get the entire pipeline running on your local machine.
+로컬 머신에서 전체 파이프라인을 실행하려면 다음 단계를 따르세요.
 
-### Prerequisites
+### 사전 요구 사항
 
--   Docker & Docker Compose
--   An internet connection for pulling Docker images.
+-   Docker 및 Docker Compose
+-   Docker 이미지를 가져오기 위한 인터넷 연결
 
-### Step 1: Start Infrastructure Services
+### 실행 방법
 
-This command starts Kafka, Zookeeper, Flink (JobManager & TaskManager), and Redis.
+단 하나의 스크립트로 인프라 시작, 데이터베이스 초기화, Flink 작업 배포, 데이터 생성기 시작까지 모든 과정을 수행합니다.
 
-```bash
+```shell
 ./scripts/setup.sh
 ```
 
-### Step 2: Deploy the Flink Job
+스크립트가 완료되면 전체 파이프라인이 실행 중인 상태가 됩니다!
 
-This script compiles the Java application (if needed) and submits it to the Flink cluster.
+## 📊 확인 방법
 
+시스템을 관찰하고 데이터에 접근하는 방법은 다음과 같습니다.
+
+### 모니터링 대시보드
+
+| 서비스 | URL | 설명 |
+| --- | --- | --- |
+| **Serving API** | `http://localhost:8000/docs` | 대화형 API 문서 (Swagger UI). |
+| **Flink UI** | `http://localhost:8081` | Flink 작업 및 클러스터 상태 모니터링. |
+| **Kafka UI** | `http://localhost:8080` | Kafka 토픽 및 메시지 탐색. |
+| **RedisInsight** | `http://localhost:5540` | Redis에 저장된 데이터 검사를 위한 GUI. |
+| **Grafana** | `http://localhost:3000` | Flink 메트릭 시각화 (User/Pass: admin/admin). |
+
+### API 엔드포인트
+
+Serving API는 다음과 같은 주요 엔드포인트를 제공합니다:
+
+| 메서드 | 엔드포인트 | 설명 |
+| --- | --- | --- |
+| `GET` | `/ctr/latest` | 모든 상품에 대한 최신 CTR 데이터를 가져옵니다. |
+| `GET` | `/ctr/previous` | 모든 상품에 대한 이전 CTR 데이터를 가져옵니다. |
+| `GET` | `/ctr/{product_id}` | 특정 상품에 대한 최신 및 이전 CTR 통합 뷰를 가져옵니다. |
+
+### 데이터 검증
+
+**ClickHouse:**
 ```bash
-./scripts/deploy-flink-job.sh
+docker compose exec -it clickhouse clickhouse-client --query "SELECT count() FROM ctr_results"
 ```
 
-### Step 3: Start the Data Producers
-
-This script starts the Python scripts that generate and send impression/click data to Kafka.
-
+**DuckDB:**
 ```bash
-./scripts/start-producers.sh
+# Copy DuckDB file and WAL file from container
+docker cp flink-taskmanager:/tmp/ctr.duckdb ./ctr_check.duckdb
+docker cp flink-taskmanager:/tmp/ctr.duckdb.wal ./ctr_check.duckdb.wal
+
+# Query with duckdb cli (requires duckdb installed locally)
+duckdb ctr_check.duckdb "SELECT * FROM ctr_results LIMIT 10"
 ```
 
-The entire pipeline is now running!
-
-## 📊 How to Verify
-
-You can observe the system and access the data in several ways.
-
-### Monitoring Dashboards
-
-| Service        | URL                               | Description                               |
-| -------------- | --------------------------------- | ----------------------------------------- |
-| **Serving API**  | `http://localhost:8000/docs`      | Interactive API documentation (Swagger UI). |
-| **Flink UI**     | `http://localhost:8081`           | Monitor Flink jobs and cluster status.    |
-| **Kafka UI**     | `http://localhost:8080`           | Browse Kafka topics and messages.         |
-| **RedisInsight** | `http://localhost:5540`           | GUI for inspecting data stored in Redis.  |
-
-### API Endpoints
-
-The Serving API provides the following main endpoints:
-
-| Method | Endpoint                  | Description                                          |
-| ------ | ------------------------- | ---------------------------------------------------- |
-| `GET`  | `/ctr/latest`             | Get the latest CTR data for all products.            |
-| `GET`  | `/ctr/previous`           | Get the previous CTR data for all products.          |
-| `GET`  | `/ctr/{product_id}`       | Get a combined view of latest & previous CTR for one product. |
-
-### Direct Redis Check
-
-You can also connect directly to Redis to see the data hashes.
-
+**Redis:**
 ```bash
-# Connect to the Redis container
-docker exec -it redis redis-cli
-
-# Check the latest and previous keys
-HGETALL ctr:latest
-HGETALL ctr:previous
+docker compose exec -it redis redis-cli HGETALL ctr:latest
 ```
 
-## 🛑 How to Stop
+## 🛑 중지 방법
 
-Use the provided scripts to stop the different parts of the application.
+제공된 스크립트를 사용하여 애플리케이션의 각 부분을 중지할 수 있습니다.
 
 ```bash
-# Stop the data producers
+# 데이터 생성기 중지
 ./scripts/stop-producers.sh
 
-# Stop the Flink job
+# Flink 작업 중지
 ./scripts/stop-flink-job.sh
 
-# Stop and remove all infrastructure services
+# 모든 인프라 서비스 중지 및 제거
 docker-compose down
 ```
 
-## 📜 Scripts Overview
+## 📜 스크립트 개요
 
-This project includes several helper scripts in the `/scripts` directory to simplify management:
+이 프로젝트는 관리를 단순화하기 위해 `/scripts` 디렉토리에 여러 헬퍼 스크립트를 포함하고 있습니다:
 
-| Script                 | Description                                                              |
-| ---------------------- | ------------------------------------------------------------------------ |
-| `create-topics.sh`     | Creates the required `impressions` and `clicks` topics in Kafka.         |
-| `deploy-flink-job.sh`  | Deploys the Flink application to the cluster.                            |
-| `start-producers.sh`   | Starts the Python data producers in the background.                      |
-| `stop-producers.sh`    | Stops the background producer processes.                                 |
-| `stop-flink-job.sh`    | Finds and cancels the running Flink job.                                 |
+| 스크립트 | 설명 |
+| --- | --- |
+| `setup.sh` | 전체 파이프라인(인프라, DB 초기화, Flink Job, Producer)을 한 번에 설정하고 실행합니다. |
+| `create-topics.sh` | Kafka에 필요한 `impressions` 및 `clicks` 토픽을 생성합니다. |
+| `deploy-flink-job.sh` | Flink 애플리케이션을 클러스터에 배포합니다. |
+| `stop-flink-job.sh` | 실행 중인 Flink 작업을 찾아 취소합니다. |
+| `start-producers.sh` | Python 데이터 생성기를 백그라운드에서 시작합니다. |
+| `stop-producers.sh` | 백그라운드 생성기 프로세스를 중지합니다. |
 
-*Note: You may need to make scripts executable first: `chmod +x scripts/*.sh`*
+*참고: 스크립트를 실행 가능하게 만들어야 할 수도 있습니다: `chmod +x scripts/*.sh`*
 
-## ⚙️ Configuration Details
+## ⚙️ 구성 상세
 
-### Flink Processing Logic
+### Flink 처리 로직
 
--   **Window:** 10-second Tumbling Window
--   **Time Characteristic:** Event Time
--   **Watermark:** 3 seconds (handles events arriving up to 3s late)
--   **Allowed Lateness:** 5 seconds (allows window to be updated by very late events)
+-   **Window:** 10초 텀블링 윈도우 (Tumbling Window)
+-   **Time Characteristic:** 이벤트 시간 (Event Time)
+-   **Watermark:** 2초 (최대 2초 늦게 도착하는 이벤트 처리)
+-   **Allowed Lateness:** 5초 (매우 늦은 이벤트로 윈도우 업데이트 허용)
 
-### Redis Data Structure
+### Redis 데이터 구조
 
--   **`ctr:latest`**: A Redis Hash storing the most recent CTR results for each product.
+-   **`ctr:latest`**: 각 상품의 가장 최근 CTR 결과를 저장하는 Redis Hash.
     -   `field`: `product_id`
-    -   `value`: JSON string with CTR data
--   **`ctr:previous`**: A Redis Hash storing the results from the window immediately preceding the latest one. Structure is identical to `ctr:latest`.
+    -   `value`: CTR 데이터가 포함된 JSON 문자열
+-   **`ctr:previous`**: 최신 윈도우 바로 직전 윈도우의 결과를 저장하는 Redis Hash. 구조는 `ctr:latest`와 동일합니다.
 
 ---
 
-*This project was iteratively developed and improved by a user in collaboration with the AI assistants **Claude** and **Gemini**.*
+*이 프로젝트는 AI 어시스턴트 **Codex** 및 **Gemini**를 활용하여 반복적으로 개발하고 개선했습니다.*
