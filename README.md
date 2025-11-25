@@ -152,11 +152,11 @@ docker compose exec -it clickhouse clickhouse-client --query "SELECT count() FRO
 
 **DuckDB:**
 ```bash
-# Copy DuckDB file and WAL file from container
+# 로컬로 복사합니다.
 docker cp flink-taskmanager:/tmp/ctr.duckdb ./ctr_check.duckdb
 docker cp flink-taskmanager:/tmp/ctr.duckdb.wal ./ctr_check.duckdb.wal
 
-# Query with duckdb cli (requires duckdb installed locally)
+# DuckDB CLI로 조회합니다. (DuckDB가 로컬에 설치되어 있는 경우 동작합니다.)
 duckdb ctr_check.duckdb "SELECT * FROM ctr_results LIMIT 10"
 ```
 

@@ -59,13 +59,17 @@ fi
 
 print_success "Python 3 is installed"
 
-# Maven 확인
-print_step "Checking Maven installation..."
-if ! command -v mvn &> /dev/null; then
-    print_warning "Maven is not installed. Flink app building may fail."
-    print_warning "Please install Maven or build the Flink app manually."
+# Gradle 확인
+print_step "Checking Gradle installation..."
+GRADLE_CMD=""
+if [ -x "flink-app/gradlew" ]; then
+    GRADLE_CMD="./gradlew"
+    print_success "Using project Gradle wrapper"
+elif command -v gradle &> /dev/null; then
+    GRADLE_CMD="gradle"
+    print_success "Using system Gradle"
 else
-    print_success "Maven is installed"
+    print_warning "Gradle is not installed. Flink app build will be skipped."
 fi
 
 # 기존 컨테이너 중지 및 제거
@@ -78,20 +82,18 @@ print_step "Cleaning up Docker networks..."
 docker network prune -f &> /dev/null
 print_success "Docker networks cleaned up"
 
-# Flink 애플리케이션 빌드
-if command -v mvn &> /dev/null; then
-    print_step "Building Flink application..."
-    cd flink-app
-    mvn clean package -DskipTests
+# Flink 애플리케이션 빌드 (Gradle)
+if [ -n "$GRADLE_CMD" ]; then
+    print_step "Building Flink application (Gradle)..."
+    (cd flink-app && $GRADLE_CMD clean build -x test)
     if [ $? -eq 0 ]; then
         print_success "Flink application built successfully"
     else
         print_error "Failed to build Flink application"
         exit 1
     fi
-    cd ..
 else
-    print_warning "Skipping Flink app build due to missing Maven"
+    print_warning "Skipping Flink app build due to missing Gradle"
 fi
 
 # Python 의존성 설치

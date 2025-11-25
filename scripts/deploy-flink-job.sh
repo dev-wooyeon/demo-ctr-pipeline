@@ -35,43 +35,62 @@ fi
 
 print_success "Flink cluster is accessible"
 
+# JAR 파일 경로 설정 (shadowJar: classifier 없음)
+JAR_FILE="flink-app/build/libs/ctr-calculator-1.0-SNAPSHOT.jar"
+
 # JAR 파일 존재 확인
 print_step "Checking for Flink application JAR..."
-# JAR 파일 경로 설정
-JAR_FILE="flink-app/build/libs/ctr-calculator-1.0-SNAPSHOT-all.jar"
-
 if [ ! -f "$JAR_FILE" ]; then
     print_warning "JAR file not found. Building Flink application..."
-    
-    # Gradle 확인 및 빌드 실행
-    if ! command -v ./gradlew &> /dev/null; then
-        # flink-app 디렉토리 내의 gradlew 확인
-        if [ -f "flink-app/gradlew" ]; then
-            GRADLE_CMD="./gradlew"
-        else
-            print_error "Gradle wrapper not found. Cannot build Flink application."
-            exit 1
-        fi
-    else
+
+    if [ -f "flink-app/gradlew" ]; then
         GRADLE_CMD="./gradlew"
+        print_step "Using project Gradle wrapper"
+    elif command -v gradle &> /dev/null; then
+        GRADLE_CMD="gradle"
+        print_step "Using system Gradle"
+    else
+        print_error "Gradle not found. Cannot build Flink application."
+        exit 1
     fi
-    
+
     print_step "Building Flink application with Gradle..."
-    cd flink-app
-    $GRADLE_CMD clean shadowJar -x test
-    
+    (cd flink-app && $GRADLE_CMD clean shadowJar -x test)
     if [ $? -ne 0 ]; then
         print_error "Gradle build failed."
         exit 1
     fi
-    
-    cd ..
+
     print_success "Flink application built successfully"
 fi
 
 print_success "JAR file found: $JAR_FILE"
 
-# ... (중략) ...
+# JAR 업로드
+print_step "Uploading JAR to Flink..."
+UPLOAD_RESPONSE=$(curl -s -X POST -H "Expect:" -F "jarfile=@$JAR_FILE" http://localhost:8081/jars/upload)
+if [ $? -ne 0 ]; then
+    print_error "Failed to upload JAR"
+    exit 1
+fi
+
+JAR_ID=$(echo "$UPLOAD_RESPONSE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get('filename', '').split('/')[-1])
+except Exception:
+    print('', file=sys.stderr)
+    exit(1)
+")
+
+if [ -z "$JAR_ID" ]; then
+    print_error "Failed to extract JAR ID from upload response"
+    echo "Upload response: $UPLOAD_RESPONSE"
+    exit 1
+fi
+
+print_success "JAR uploaded. ID: $JAR_ID"
 
 # Job 실행
 print_step "Starting CTR Calculator job..."
