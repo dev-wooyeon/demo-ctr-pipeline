@@ -18,12 +18,17 @@ public class EventCountAggregator implements AggregateFunction<Event, EventCount
 
     @Override
     public EventCount add(Event event, EventCount accumulator) {
-        if ("view".equals(event.getEventType())) {
+        if (isImpressionEvent(event)) {
             accumulator.incrementImpressions();
         } else if ("click".equals(event.getEventType())) {
             accumulator.incrementClicks();
         }
         return accumulator;
+    }
+
+    private boolean isImpressionEvent(Event event) {
+        String type = event.getEventType();
+        return "view".equals(type) || "impression".equals(type);
     }
 
     @Override

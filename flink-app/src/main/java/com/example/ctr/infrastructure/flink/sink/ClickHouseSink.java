@@ -24,7 +24,7 @@ public class ClickHouseSink {
     public SinkFunction<CTRResult> createSink() {
         return JdbcSink.sink(
                 "INSERT INTO ctr_results (product_id, ctr, impressions, clicks, window_start, window_end) VALUES (?, ?, ?, ?, ?, ?)",
-                (JdbcStatementBuilder<CTRResult>) this::bindCtrResult,
+                (JdbcStatementBuilder<CTRResult>) ClickHouseSink::bindCtrResult,
                 JdbcExecutionOptions.builder()
                         .withBatchSize(1000)
                         .withBatchIntervalMs(200)
@@ -43,7 +43,7 @@ public class ClickHouseSink {
     private static final int IDX_WINDOW_START = 5;
     private static final int IDX_WINDOW_END = 6;
 
-    private void bindCtrResult(PreparedStatement ps, CTRResult ctrResult) throws SQLException {
+    private static void bindCtrResult(PreparedStatement ps, CTRResult ctrResult) throws SQLException {
         ps.setString(IDX_PRODUCT_ID, ctrResult.getProductId());
         ps.setDouble(IDX_CTR, ctrResult.getCtr());
         ps.setLong(IDX_IMPRESSIONS, ctrResult.getImpressions());

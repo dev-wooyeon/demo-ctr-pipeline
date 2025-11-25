@@ -10,6 +10,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @RequiredArgsConstructor
 public class CtrApplication implements CommandLineRunner {
 
+    static {
+        // Disable Spring Boot's logging system so that Flink's Log4j stack handles bindings.
+        System.setProperty(
+                "org.springframework.boot.logging.LoggingSystem",
+                System.getProperty("org.springframework.boot.logging.LoggingSystem", "none"));
+    }
+
     private final CtrJobService ctrJobService;
 
     public static void main(String[] args) {

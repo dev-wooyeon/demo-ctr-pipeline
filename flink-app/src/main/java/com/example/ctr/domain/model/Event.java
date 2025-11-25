@@ -1,6 +1,7 @@
 package com.example.ctr.domain.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,6 +16,7 @@ import java.util.Set;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Event {
     @JsonProperty("event_id")
     private String eventId;
@@ -31,6 +33,9 @@ public class Event {
     @JsonProperty("timestamp")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime timestamp;
+
+    @JsonProperty("session_id")
+    private String sessionId;
 
     public boolean hasProductId() {
         return productId != null && !productId.isEmpty();
@@ -49,5 +54,5 @@ public class Event {
         return timestamp.atOffset(ZoneOffset.UTC).toInstant().toEpochMilli();
     }
 
-    private static final Set<String> VALID_EVENT_TYPES = Set.of("view", "click");
+    private static final Set<String> VALID_EVENT_TYPES = Set.of("view", "impression", "click");
 }

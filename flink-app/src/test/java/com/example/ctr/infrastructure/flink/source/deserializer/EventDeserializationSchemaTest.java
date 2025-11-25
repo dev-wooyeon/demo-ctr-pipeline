@@ -14,7 +14,7 @@ class EventDeserializationSchemaTest {
         String payload = """
                 {
                   "event_id": "1",
-                  "event_type": "view",
+                  "event_type": "impression",
                   "product_id": "P123",
                   "user_id": "U1",
                   "timestamp": "2024-01-01 12:00:00"
@@ -26,6 +26,28 @@ class EventDeserializationSchemaTest {
         assertThat(event).isNotNull();
         assertThat(event.getProductId()).isEqualTo("P123");
         assertThat(event.isValid()).isTrue();
+    }
+
+    @Test
+    void deserializesEpochMillisTimestamp() throws Exception {
+        long epochMillis = 1_700_000_000_000L;
+        String payload = """
+                {
+                  "event_id": "10",
+                  "event_type": "click",
+                  "product_id": "P999",
+                  "user_id": "U9",
+                  "timestamp": %d,
+                  "session_id": "session_1"
+                }
+                """.formatted(epochMillis);
+
+        Event event = schema.deserialize(payload.getBytes());
+
+        assertThat(event).isNotNull();
+        assertThat(event.getTimestamp()).isNotNull();
+        assertThat(event.eventTimeMillisUtc()).isEqualTo(epochMillis);
+        assertThat(event.getSessionId()).isEqualTo("session_1");
     }
 
     @Test

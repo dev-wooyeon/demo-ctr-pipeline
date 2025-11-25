@@ -20,7 +20,9 @@ def flinkVersion = '1.18.1'
 
 dependencies {
     // Spring Boot
-    implementation 'org.springframework.boot:spring-boot-starter'
+    implementation('org.springframework.boot:spring-boot-starter') {
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-logging'
+    }
     implementation 'jakarta.validation:jakarta.validation-api:3.0.2'
     implementation 'org.hibernate.validator:hibernate-validator:8.0.1.Final'
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
@@ -66,14 +68,24 @@ tasks.named('test') {
 
 shadowJar {
     archiveClassifier.set('')
-    
+
     mergeServiceFiles()
-    
+    mergeServiceFiles {
+        include 'META-INF/spring.handlers'
+        include 'META-INF/spring.schemas'
+        include 'META-INF/spring.factories'
+        include 'META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports'
+    }
+
     manifest {
         attributes 'Main-Class': 'com.example.ctr.CtrApplication'
     }
 }
 
 jar {
+    enabled = false
+}
+
+bootJar {
     enabled = false
 }
