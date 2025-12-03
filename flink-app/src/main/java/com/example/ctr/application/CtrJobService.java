@@ -1,15 +1,11 @@
 package com.example.ctr.application;
 
-// import com.example.ctr.infrastructure.flink.FlinkEnvironmentFactory;
 import com.example.ctr.infrastructure.flink.CtrJobPipelineBuilder;
 import com.example.ctr.infrastructure.flink.FlinkEnvironmentFactory;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.springframework.stereotype.Service;
-
-import jakarta.annotation.PreDestroy;
 
 /**
  * CTR Flink 잡을 시작하는 서비스.
@@ -21,7 +17,6 @@ import jakarta.annotation.PreDestroy;
  * 3️⃣ 잡 실행 및 그레이스풀 셧다운 처리
  */
 @Slf4j
-@Service
 @RequiredArgsConstructor
 public class CtrJobService {
 
@@ -65,8 +60,4 @@ public class CtrJobService {
         }, "flink-shutdown-hook"));
     }
 
-    @PreDestroy
-    public void onDestroy() {
-        log.info("CtrJobService is being destroyed. Cleanup if needed.");
-    }
 }

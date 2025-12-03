@@ -6,7 +6,6 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
 
@@ -15,7 +14,6 @@ import java.util.concurrent.TimeUnit;
  *
  * Configuration values are supplied via {@link CtrJobProperties}.
  */
-@Component
 public class FlinkEnvironmentFactory {
 
     private final CtrJobProperties properties;
