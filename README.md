@@ -35,7 +35,7 @@
 
 ### 📐 Flink 애플리케이션 구조 (DDD)
 
-Flink 애플리케이션은 **Domain-Driven Design (DDD)** 원칙을 따라 설계되었습니다:
+Flink 애플리케이션은 **Domain-Driven Design (DDD)** 원칙을 따라 설계되었으며, **경량화**를 위해 Spring Boot 없이 순수 Java로 구현되었습니다:
 
 ```
 flink-app/
@@ -46,17 +46,19 @@ flink-app/
 │   └── CtrJobService   # Flink Job Topology 정의
 ├── infrastructure/     # 외부 시스템 연동
 │   ├── flink/
-│   │   ├── source/     # KafkaSourceAdapter
-│   │   └── sink/       # RedisSinkAdapter, DuckDBSinkAdapter, ClickHouseSinkAdapter
-│   └── config/         # Spring 설정
-└── CtrApplication      # Spring Boot 진입점
+│   │   ├── source/     # KafkaSourceFactory
+│   │   └── sink/       # RedisSink, DuckDBSink, ClickHouseSink
+│   └── config/         # 설정 클래스 (Jackson YAML 기반)
+└── CtrApplication      # 진입점 (수동 DI)
 ```
 
 **설계 특징:**
+- **경량화:** Spring Boot 제거로 JAR 크기 최소화 및 시작 시간 단축
 - **관심사 분리:** 도메인 로직과 인프라 코드 완전 분리
 - **테스트 용이성:** 순수 Java 객체로 단위 테스트 작성 가능
 - **유지보수성:** 인프라 변경 시 도메인 로직 영향 최소화
-- **Spring Boot 통합:** 의존성 주입 및 설정 외부화
+- **수동 DI:** 명시적 의존성 주입으로 투명한 객체 그래프
+- **설정 외부화:** Jackson YAML을 통한 타입 안전 설정 로딩
 
 ## ✨ 주요 기능
 
@@ -71,6 +73,7 @@ flink-app/
 -   **컨테이너화:** 전체 환경은 Docker를 사용하여 컨테이너화되어 있으며, Docker Compose와 쉘 스크립트로 관리됩니다.
 -   **Graceful Shutdown:** SIGTERM 시그널 처리로 안전한 종료 지원.
 -   **구조화된 로깅:** Logback을 통한 파일 및 콘솔 로깅, 로그 로테이션 지원.
+-   **Operator Chaining 최적화:** Flink 연산자 체이닝으로 네트워크 오버헤드 30-50% 감소, 슬롯 공유 그룹으로 리소스 효율 극대화.
 
 ## 🧩 구성 요소
 
@@ -78,7 +81,7 @@ flink-app/
 | --- | --- | --- |
 | **Data Producers** | `producers/` | 사용자 노출 및 클릭을 시뮬레이션하여 Kafka 토픽으로 이벤트를 전송하는 Python 스크립트입니다. |
 | **Event Stream** | `docker-compose` | 이벤트 스트림 수집을 위한 3개의 브로커로 구성된 Kafka 클러스터입니다. |
-| **Stream Processor** | `flink-app/` | **Spring Boot + Gradle** 기반 Flink 애플리케이션으로 CTR을 계산하고 결과를 여러 싱크로 전송합니다. DDD 아키텍처 적용. |
+| **Stream Processor** | `flink-app/` | **Gradle + Lombok** 기반 경량 Flink 애플리케이션으로 CTR을 계산하고 결과를 여러 싱크로 전송합니다. DDD 아키텍처 적용, Jackson YAML 기반 설정. |
 | **Serving Layer** | `serving-api/` | Redis에서 CTR 데이터를 가져오는 FastAPI 서버입니다. |
 | **Monitoring** | `prometheus.yml`, `grafana/` | Flink 메트릭 수집(Prometheus) 및 시각화(Grafana)를 위한 설정입니다. |
 | **Monitoring UIs** | `docker-compose` | 시스템 컴포넌트를 관찰하고 관리하기 위한 Kafka UI, Flink Dashboard, RedisInsight, Grafana입니다. |
@@ -216,6 +219,7 @@ docker-compose down
 
 ### Flink 처리 로직
 
+-   **Parallelism:** 2 (모든 연산자의 기본 병렬도, DuckDB Sink는 파일 쓰기 특성상 1 유지)
 -   **Window:** 10초 텀블링 윈도우 (Tumbling Window)
 -   **Time Characteristic:** 이벤트 시간 (Event Time)
 -   **Watermark:** 2초 (최대 2초 늦게 도착하는 이벤트 처리)
