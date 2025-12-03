@@ -2,9 +2,6 @@ package com.example.ctr.config;
 
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.CheckpointConfig.ExternalizedCheckpointCleanup;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
-import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
@@ -14,15 +11,9 @@ import lombok.Setter;
 
 /**
  * Holds configuration properties for the CTR Flink job.
- *
- * All properties are loaded from {@code application.yml} under the prefix
- * {@code ctr.job}.
  */
 @Getter
 @Setter
-@Component
-@ConfigurationProperties(prefix = "ctr.job")
-@Validated
 public class CtrJobProperties {
 
     // Kafka topics and consumer group
@@ -34,7 +25,7 @@ public class CtrJobProperties {
     private String groupId;
     // Execution
     @Positive
-    private int parallelism = 1;
+    private int parallelism = 2;
     // Checkpointing
     @Positive
     private long checkpointInterval = 60000L;

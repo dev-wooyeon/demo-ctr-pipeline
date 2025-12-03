@@ -24,23 +24,23 @@ duckdb:
 
 ctr:
   job:
-    impression-topic: ${kafka.topics.impression}
-    click-topic: ${kafka.topics.click}
-    group-id: ${kafka.group-id}
-    parallelism: ${flink.parallelism:1}
-    checkpoint-enabled: ${flink.checkpoint.enabled:true}
-    checkpoint-interval: ${flink.checkpoint.interval:60000}
-    checkpoint-timeout: ${flink.checkpoint.timeout:600000}
-    checkpoint-min-pause: ${flink.checkpoint.min-pause:5000}
-    checkpoint-max-concurrent: ${flink.checkpoint.max-concurrent:1}
-    checkpoint-storage: ${flink.state-backend.checkpoint-dir:file:///tmp/flink-checkpoints}
-    checkpointing-mode: ${flink.checkpoint.mode:EXACTLY_ONCE}
+    impression-topic: impressions
+    click-topic: clicks
+    group-id: ctr-calculator-group
+    parallelism: 2
+    checkpoint-enabled: true
+    checkpoint-interval: 60000
+    checkpoint-timeout: 600000
+    checkpoint-min-pause: 5000
+    checkpoint-max-concurrent: 1
+    checkpoint-storage: file:///tmp/flink-checkpoints
+    checkpointing-mode: EXACTLY_ONCE
     externalized-checkpoint-cleanup: RETAIN_ON_CANCELLATION
-    restart-attempts: ${flink.restart-strategy.attempts:3}
-    restart-delay-ms: ${flink.restart-strategy.delay:10000}
+    restart-attempts: 3
+    restart-delay-ms: 10000
 
 flink:
-  parallelism: 1
+  parallelism: 2
   
   # 체크포인트 설정 (데이터 유실 방지)
   checkpoint:

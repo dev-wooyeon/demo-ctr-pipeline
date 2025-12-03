@@ -1,7 +1,37 @@
-spring:
-  main:
-    web-application-type: none
-  application:
-    name: ctr-calculator
-  profiles:
-    active: local
+kafka:
+  bootstrap-servers: localhost:9092
+  topics:
+    impression: impressions
+    click: clicks
+  group-id: ctr-calculator-group
+
+redis:
+  host: localhost
+  port: 6379
+
+clickhouse:
+  url: jdbc:clickhouse://localhost:8123/default
+  driver: com.clickhouse.jdbc.ClickHouseDriver
+
+duckdb:
+  url: jdbc:duckdb:/tmp/ctr.duckdb
+
+ctr:
+  job:
+    impression-topic: impressions
+    click-topic: clicks
+    group-id: ctr-calculator-group
+    parallelism: 2
+    checkpoint-enabled: true
+    checkpoint-interval: 60000
+    checkpoint-timeout: 600000
+    checkpoint-min-pause: 5000
+    checkpoint-max-concurrent: 1
+    checkpoint-storage: file:///tmp/flink-checkpoints
+    checkpointing-mode: EXACTLY_ONCE
+    externalized-checkpoint-cleanup: RETAIN_ON_CANCELLATION
+    restart-attempts: 3
+    restart-delay-ms: 10000
+
+flink:
+  parallelism: 2
