@@ -3,12 +3,7 @@ package com.example.ctr.domain.service;
 import com.example.ctr.domain.model.Event;
 import com.example.ctr.domain.model.EventCount;
 import org.apache.flink.api.common.functions.AggregateFunction;
-import org.springframework.stereotype.Component;
 
-/**
- * 이벤트를 집계하여 조회수(impressions)와 클릭수(clicks)를 계산하는 Aggregator
- */
-@Component
 public class EventCountAggregator implements AggregateFunction<Event, EventCount, EventCount> {
 
     @Override

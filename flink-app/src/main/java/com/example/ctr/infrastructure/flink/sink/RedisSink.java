@@ -4,9 +4,7 @@ import com.example.ctr.config.RedisProperties;
 import com.example.ctr.domain.model.CTRResult;
 import com.example.ctr.infrastructure.flink.sink.impl.RedisRichSink;
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction;
-import org.springframework.stereotype.Component;
 
-@Component
 public class RedisSink {
 
     private final RedisProperties redisProperties;

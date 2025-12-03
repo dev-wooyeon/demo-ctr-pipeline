@@ -5,12 +5,7 @@ import com.example.ctr.domain.model.EventCount;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
-import org.springframework.stereotype.Component;
 
-/**
- * 윈도우별로 집계된 EventCount를 CTRResult로 변환하는 ProcessFunction
- */
-@Component
 public class CTRResultWindowProcessFunction
         extends ProcessWindowFunction<EventCount, CTRResult, String, TimeWindow> {
 
