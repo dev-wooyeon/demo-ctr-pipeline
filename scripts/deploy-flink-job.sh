@@ -97,8 +97,8 @@ print_step "Starting CTR Calculator job..."
 JOB_RESPONSE=$(curl -s -X POST "http://localhost:8081/jars/$JAR_ID/run" \
     -H "Content-Type: application/json" \
     -d '{
-        "entryClass": "com.example.ctr.CtrApplicationKt",
-        "parallelism": 1,
+        "entryClass": "com.example.ctr.CtrApplication",
+        "parallelism": 2,
         "programArgs": "",
         "savepointPath": null
     }')
