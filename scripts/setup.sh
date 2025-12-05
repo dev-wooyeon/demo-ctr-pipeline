@@ -95,7 +95,7 @@ print_success "Docker networks cleaned up"
 # Flink 애플리케이션 빌드 (Gradle)
 if [ -n "$GRADLE_CMD" ]; then
     print_step "Building Flink application (Gradle)..."
-    (cd flink-app && $GRADLE_CMD clean build -x test)
+    (cd flink-app && $GRADLE_CMD clean shadowJar -x test)
     if [ $? -eq 0 ]; then
         print_success "Flink application built successfully"
     else

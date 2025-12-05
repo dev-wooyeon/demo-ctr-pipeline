@@ -1,6 +1,8 @@
 package com.example.ctr.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -66,6 +68,7 @@ public class AppConfig {
         try {
             ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
             mapper.setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE);
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
             // Try loading application-local.yml first, then application.yml
             InputStream is = AppConfig.class.getClassLoader().getResourceAsStream("application-local.yml");

@@ -34,6 +34,8 @@ dependencies {
     implementation 'redis.clients:jedis:5.1.0'
 
     // Utils
+    implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+    implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
     implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
     implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jacksonVersion}"
     implementation "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${jacksonVersion}"
@@ -70,6 +72,23 @@ shadowJar {
 
     manifest {
         attributes 'Main-Class': 'com.example.ctr.CtrApplication'
+    }
+
+    // Flink에서 제공하는 라이브러리는 제외하고, 사용자 의존성은 포함
+    dependencies {
+        // Flink 런타임에서 제공하는 것들만 제외
+        exclude(dependency("org.apache.flink:flink-java:.*"))
+        exclude(dependency("org.apache.flink:flink-streaming-java:.*"))
+        exclude(dependency("org.apache.flink:flink-clients:.*"))
+        exclude(dependency("org.apache.flink:flink-core:.*"))
+        exclude(dependency("org.apache.flink:flink-runtime:.*"))
+        exclude(dependency("org.apache.flink:flink-optimizer:.*"))
+        exclude(dependency("org.apache.flink:flink-annotations:.*"))
+        exclude(dependency("org.apache.flink:flink-queryable-state-client-java:.*"))
+        exclude(dependency("org.apache.flink:flink-shaded-.*:.*"))
+        exclude(dependency("org.slf4j:.*:.*"))
+        exclude(dependency("log4j:.*:.*"))
+        exclude(dependency("ch.qos.logback:.*:.*"))
     }
 }
 
