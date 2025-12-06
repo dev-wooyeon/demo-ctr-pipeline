@@ -13,6 +13,7 @@ data class CTRResult(
 ) {
 
     companion object {
+        @JvmStatic
         fun calculate(productId: String, impressions: Long, clicks: Long, windowStart: Long, windowEnd: Long): CTRResult {
             val ctrValue = if (impressions == 0L) 0.0 else clicks.toDouble() / impressions
             return CTRResult(

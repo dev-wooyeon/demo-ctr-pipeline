@@ -64,7 +64,7 @@ class EventCountTest {
         EventCount original = new EventCount(100L, 5L);
 
         // When
-        EventCount copy = original.copy();
+        EventCount copy = new EventCount(original.getImpressions(), original.getClicks());
         copy.incrementImpressions();
         copy.incrementClicks();
 

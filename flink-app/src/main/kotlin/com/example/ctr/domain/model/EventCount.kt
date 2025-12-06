@@ -17,8 +17,10 @@ data class EventCount(
     }
 
     companion object {
+        @JvmStatic
         fun initial(): EventCount = EventCount()
 
+        @JvmStatic
         fun merge(a: EventCount, b: EventCount): EventCount =
             EventCount(a.impressions + b.impressions, a.clicks + b.clicks)
     }
