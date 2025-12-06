@@ -2,8 +2,6 @@ package com.example.ctr
 
 import com.example.ctr.application.CtrJobService
 import com.example.ctr.config.AppConfig
-import com.example.ctr.domain.service.CTRResultWindowProcessFunction
-import com.example.ctr.domain.service.EventCountAggregator
 import com.example.ctr.infrastructure.flink.CtrJobPipelineBuilder
 import com.example.ctr.infrastructure.flink.FlinkEnvironmentFactory
 import com.example.ctr.infrastructure.flink.sink.ClickHouseSink
@@ -28,16 +26,12 @@ object CtrApplication {
             val duckDBSink = DuckDBSink(config.duckdb)
             val clickHouseSink = ClickHouseSink(config.clickhouse)
             val flinkEnvironmentFactory = FlinkEnvironmentFactory(config.ctr.job)
-            val aggregator = EventCountAggregator()
-            val windowFunction = CTRResultWindowProcessFunction()
             val pipelineBuilder = CtrJobPipelineBuilder(
                 kafkaSourceFactory,
                 redisSink,
                 duckDBSink,
                 clickHouseSink,
-                aggregator,
-                windowFunction,
-                config.ctr.job
+                properties = config.ctr.job
             )
 
             val jobService = CtrJobService(flinkEnvironmentFactory, pipelineBuilder)
