@@ -284,7 +284,6 @@ serving-api/ (전체 디렉토리)
 
 # 유지할 서비스:
 # - kafka1, kafka2, kafka3
-# - zookeeper
 # - kafka-ui
 # - flink-jobmanager
 # - flink-taskmanager
