@@ -27,34 +27,43 @@ val flinkVersion = "1.18.1"
 val jacksonVersion = "2.15.2"
 
 dependencies {
+    // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
+    // Flink
     implementation("org.apache.flink:flink-java:$flinkVersion")
     implementation("org.apache.flink:flink-streaming-java:$flinkVersion")
     implementation("org.apache.flink:flink-clients:$flinkVersion")
-
+    
+    // Flink Connectors
     implementation("org.apache.flink:flink-connector-kafka:3.0.2-1.18")
     implementation("org.apache.flink:flink-connector-jdbc:3.1.2-1.18")
 
+    // ClickHouse JDBC Driver
     implementation("com.clickhouse:clickhouse-jdbc:0.4.6")
 
+    // Jackson
     implementation("com.fasterxml.jackson.core:jackson-core:$jacksonVersion")
     implementation("com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion")
     implementation("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksonVersion")
 
+    // Logging
     implementation("org.slf4j:slf4j-api:2.0.7")
     implementation("ch.qos.logback:logback-classic:1.4.11")
 
+    // Validation
     implementation("jakarta.validation:jakarta.validation-api:3.0.2")
     implementation("org.hibernate.validator:hibernate-validator:8.0.1.Final")
     implementation("org.glassfish:jakarta.el:4.0.2")
 
+    // Metrics
     implementation("jakarta.annotation:jakarta.annotation-api:2.1.1")
     implementation("org.apache.flink:flink-metrics-prometheus:$flinkVersion")
 
+    // Testing
     testImplementation("org.apache.flink:flink-test-utils:$flinkVersion")
     testImplementation("org.assertj:assertj-core:3.24.2")
     testImplementation("org.junit.jupiter:junit-jupiter")
