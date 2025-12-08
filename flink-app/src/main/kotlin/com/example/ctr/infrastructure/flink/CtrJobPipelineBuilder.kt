@@ -90,7 +90,7 @@ class CtrJobPipelineBuilder(
             .name("$namePrefix Sink")
             .uid(uid)
             .slotSharingGroup(slotSharingGroup)
-            .disableChaining()
+            // .disableChaining()
         parallelism?.let { sinkOperator.setParallelism(it) }
     }
 }
