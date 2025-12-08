@@ -1,12 +1,12 @@
 kafka:
-  bootstrap-servers: localhost:9092
+  bootstrap-servers: kafka1:29092,kafka2:29093,kafka3:29094
   topics:
     impression: impressions
     click: clicks
   group-id: ctr-calculator-group
 
 clickhouse:
-  url: jdbc:clickhouse://localhost:8123/default
+  url: jdbc:clickhouse://clickhouse:8123/default
   driver: com.clickhouse.jdbc.ClickHouseDriver
 
 ctr:

@@ -6,15 +6,22 @@ from datetime import datetime
 from kafka import KafkaProducer
 
 class ImpressionProducer:
-    def __init__(self, bootstrap_servers=['localhost:9092', 'localhost:9093', 'localhost:9094']):
+    def __init__(self, bootstrap_servers=None):
+        if bootstrap_servers is None:
+            bootstrap_servers = ['localhost:19092', 'localhost:19093', 'localhost:19094']
+
         self.producer = KafkaProducer(
             bootstrap_servers=bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
             key_serializer=lambda k: k.encode('utf-8'),
             acks='all',
             retries=3,
-            retry_backoff_ms=100
+            retry_backoff_ms=100,
+            # Performance Tuning for High Throughput
+            linger_ms=10,        # Wait up to 10ms to batch messages
+            batch_size=16384 * 4  # 64KB batch size
         )
+
         self.users = ['user1', 'user2', 'user3', 'user4', 'user5']
         self.products = ['product1', 'product2', 'product3', 'product4', 'product5']
         self.session_counter = 1000
@@ -34,24 +41,31 @@ class ImpressionProducer:
         return event
     
     def run(self):
-        print("Starting impression producer...")
-        print(f"Sending impression events every 0.25 seconds (2x increased rate)")
+        print("Starting impression producer (High Throughput Mode)...")
         
         try:
+            count = 0
+            start_time = time.time()
+            
             while True:
                 event = self.generate_impression_event()
                 
-                # Send to Kafka topic with product_id as key for partitioning
-                future = self.producer.send(
+                # Send to Kafka (async)
+                self.producer.send(
                     'impressions',
                     key=event['product_id'],
                     value=event
                 )
                 
-                # Log the sent event
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Sent impression: {event['user_id']} -> {event['product_id']}")
+                count += 1
                 
-                time.sleep(0.001)  # 0.25초마다 전송 (기존 2배 증가)
+                # Log stats every 5000 records to avoid I/O bottleneck
+                if count % 5000 == 0:
+                    elapsed = time.time() - start_time
+                    rate = count / elapsed
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Sent {count} impressions. Rate: {rate:.2f} msg/sec")
+                
+                # No sleep for max throughput
                 
         except KeyboardInterrupt:
             print("\nStopping impression producer...")
@@ -59,5 +73,10 @@ class ImpressionProducer:
             self.producer.close()
 
 if __name__ == "__main__":
-    producer = ImpressionProducer()
+    import os
+    bootstrap_servers_env = os.environ.get('BOOTSTRAP_SERVERS')
+    if bootstrap_servers_env:
+        producer = ImpressionProducer(bootstrap_servers=bootstrap_servers_env.split(','))
+    else:
+        producer = ImpressionProducer()
     producer.run()

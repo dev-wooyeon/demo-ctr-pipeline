@@ -6,15 +6,22 @@ from datetime import datetime
 from kafka import KafkaProducer
 
 class ClickProducer:
-    def __init__(self, bootstrap_servers=['localhost:9092', 'localhost:9093', 'localhost:9094']):
+    def __init__(self, bootstrap_servers=None):
+        if bootstrap_servers is None:
+            bootstrap_servers = ['localhost:19092', 'localhost:19093', 'localhost:19094']
+
         self.producer = KafkaProducer(
             bootstrap_servers=bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
             key_serializer=lambda k: k.encode('utf-8'),
             acks='all',
             retries=3,
-            retry_backoff_ms=100
+            retry_backoff_ms=100,
+            # Performance Tuning for High Throughput
+            linger_ms=10,
+            batch_size=16384 * 4
         )
+
         self.users = ['user1', 'user2', 'user3', 'user4', 'user5']
         self.products = ['product1', 'product2', 'product3', 'product4', 'product5']
         # 상품별 클릭률 차등 적용 (product1이 가장 높은 클릭률)
@@ -47,34 +54,42 @@ class ClickProducer:
         return None
     
     def run(self):
-        print("Starting click producer...")
-        print(f"Sending click events every 0.5 seconds (2x increased rate, probabilistic)")
+        print("Starting click producer (High Throughput Mode)...")
         print(f"Click rates: {self.product_click_rates}")
         
         try:
+            count = 0
+            start_time = time.time()
+            
             while True:
                 event = self.generate_click_event()
                 
                 if event:
-                    # Send to Kafka topic with product_id as key for partitioning
-                    future = self.producer.send(
+                    # Send to Kafka (async)
+                    self.producer.send(
                         'clicks',
                         key=event['product_id'],
                         value=event
                     )
-                    
-                    # Log the sent event
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Sent click: {event['user_id']} -> {event['product_id']}")
-                else:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] No click generated")
+                    count += 1
                 
-                time.sleep(0.002)  # 0.5초마다 시도 (기존 2배 증가)
+                    # Log stats every 2000 records (clicks are fewer than impressions)
+                    if count % 2000 == 0:
+                        elapsed = time.time() - start_time
+                        rate = count / elapsed
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Sent {count} clicks. Rate: {rate:.2f} msg/sec")
+                
+                # No sleep
                 
         except KeyboardInterrupt:
             print("\nStopping click producer...")
         finally:
             self.producer.close()
-
 if __name__ == "__main__":
-    producer = ClickProducer()
+    import os
+    bootstrap_servers_env = os.environ.get('BOOTSTRAP_SERVERS')
+    if bootstrap_servers_env:
+        producer = ClickProducer(bootstrap_servers=bootstrap_servers_env.split(','))
+    else:
+        producer = ClickProducer()
     producer.run()

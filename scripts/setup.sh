@@ -140,7 +140,12 @@ FLINK_TASKMANAGER_INSTANCES=3
 TASK_MANAGER_SLOTS=2
 TOTAL_AVAILABLE_SLOTS=$((FLINK_TASKMANAGER_INSTANCES * TASK_MANAGER_SLOTS))
 print_step "Starting Docker services with $FLINK_TASKMANAGER_INSTANCES TaskManagers (≈$TOTAL_AVAILABLE_SLOTS slots)..."
-docker compose up -d --scale flink-taskmanager=$FLINK_TASKMANAGER_INSTANCES
+docker compose up -d --build --scale flink-taskmanager=$FLINK_TASKMANAGER_INSTANCES
+
+if [ $? -ne 0 ]; then
+    print_error "Failed to start Docker services"
+    exit 1
+fi
 
 print_step "Ensuring Flink TaskManagers provide $TOTAL_AVAILABLE_SLOTS slots..."
 echo "Configured slots: $FLINK_TASKMANAGER_INSTANCES TM × $TASK_MANAGER_SLOTS slots = $TOTAL_AVAILABLE_SLOTS total slots"
