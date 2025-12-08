@@ -49,8 +49,8 @@ SETTINGS index_granularity = 8192;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ${CLICKHOUSE_DB}.ctr_ml_view
 ENGINE = AggregatingMergeTree()
-PARTITION BY toYYYYMM(window_end)
-ORDER BY (product_id, window_end) AS
+PARTITION BY toYYYYMM(window_minute)
+ORDER BY (product_id, window_minute) AS
 SELECT
     product_id,
     toStartOfInterval(window_end, INTERVAL 1 MINUTE) AS window_minute,
@@ -66,12 +66,11 @@ ENGINE = ReplacingMergeTree(window_end)
 ORDER BY product_id AS
 SELECT
     product_id,
-    argMax(ctr, window_end) AS latest_ctr,
-    argMax(impressions, window_end) AS latest_impressions,
-    argMax(clicks, window_end) AS latest_clicks,
-    max(window_end) AS window_end
-FROM ${CLICKHOUSE_DB}.ctr_results_raw
-GROUP BY product_id;
+    ctr AS latest_ctr,
+    impressions AS latest_impressions,
+    clicks AS latest_clicks,
+    window_end
+FROM ${CLICKHOUSE_DB}.ctr_results_raw;
 SQL
 
 echo "ClickHouse schema initialized"
